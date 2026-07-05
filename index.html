@@ -12,7 +12,7 @@
     .header { text-align: center; margin-bottom: 24px; }
     .header h1 { font-size: 28px; background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .tabs { display: flex; justify-content: center; gap: 12px; margin-bottom: 24px; }
-    .tab-btn { padding: 10px 28px; border: none; background: white; border-radius: 30px; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.08); transition: all 0.2s; }
+    .tab-btn { padding: 10px 28px; border: none; background: white; border-radius: 30px; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
     .tab-btn.active { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
     .publish-area { text-align: center; margin-bottom: 20px; }
     .publish-btn { padding: 12px 32px; background: white; border: 2px dashed #764ba2; border-radius: 30px; font-size: 15px; color: #764ba2; font-weight: 600; cursor: pointer; }
@@ -27,14 +27,18 @@
     .card-item-name { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
     .card-desc { font-size: 14px; color: #666; margin-bottom: 8px; }
     .card-meta { font-size: 13px; color: #888; margin-bottom: 8px; }
-    .card-contact { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #444; }
+    .card-contact { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #444; margin-bottom: 8px; }
+    .card-actions { text-align: right; }
+    .delete-card-btn { background: none; border: 1px solid #e74c3c; color: #e74c3c; padding: 4px 12px; border-radius: 20px; font-size: 12px; cursor: pointer; }
+    .delete-card-btn:hover { background: #e74c3c; color: white; }
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; padding: 20px; }
     .modal { background: white; border-radius: 20px; padding: 24px; width: 100%; max-width: 450px; position: relative; }
     .close-btn { position: absolute; top: 12px; right: 16px; background: none; border: none; font-size: 24px; cursor: pointer; color: #aaa; }
     .form-group { margin-bottom: 14px; }
     .form-group label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 14px; }
     .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 14px; }
-    .submit-btn { width: 100%; padding: 12px; background: linear-gradient(135deg, #667eea, #764ba2); border: none; border-radius: 30px; color: white; font-size: 16px; font-weight: 600; cursor: pointer; }
+    .form-group .hint { font-size: 12px; color: #999; margin-top: 2px; }
+    .submit-btn { width: 100%; padding: 12px; background: linear-gradient(135deg, #667eea, #764ba2); border: none; border-radius: 30px; color: white; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 6px; }
   </style>
 </head>
 <body>
@@ -49,6 +53,8 @@
     <div class="loading" id="loading">加载中</div>
     <div id="empty-state" style="text-align: center; padding: 40px; color: #999; display: none;">还没有任何信息～</div>
   </div>
+
+  <!-- 发布信息弹窗 -->
   <div class="modal-overlay" id="modalOverlay">
     <div class="modal">
       <button class="close-btn" id="closeModal">&times;</button>
@@ -56,15 +62,29 @@
       <form id="publishForm"></form>
     </div>
   </div>
+
+  <!-- 删除确认弹窗 -->
+  <div class="modal-overlay" id="deleteModalOverlay">
+    <div class="modal">
+      <button class="close-btn" id="closeDeleteModal">&times;</button>
+      <h2 style="text-align:center; margin-bottom:12px;">删除信息</h2>
+      <p style="text-align:center; margin-bottom:16px;">请输入发布时设置的删除密码</p>
+      <input type="password" id="deleteTokenInput" placeholder="删除密码" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:10px; margin-bottom:12px;">
+      <button id="confirmDeleteBtn" class="submit-btn">确认删除</button>
+    </div>
+  </div>
+
   <script>
-    // ========== 把下面两行换成你自己的 Supabase 信息 ==========
+    // ========== 替换为你的 Supabase 信息 ==========
     const SUPABASE_URL = "https://dyxwpojykuruehabhanj.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5eHdwb2p5a3VydWVoYWJoYW5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMzE2OTQsImV4cCI6MjA5ODgwNzY5NH0.FNxPejr--ewQvRDaU5FHIkv8-etpC05gH7Pn9CpP-cc";
 
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     let currentTab = 'lost';
+    let pendingDeleteItemId = null; // 待删除的项 ID
 
+    // DOM 元素
     const tabLost = document.getElementById('tab-lost');
     const tabTrade = document.getElementById('tab-trade');
     const publishBtn = document.getElementById('publishBtn');
@@ -75,7 +95,12 @@
     const modalTitle = document.getElementById('modalTitle');
     const publishForm = document.getElementById('publishForm');
     const closeModalBtn = document.getElementById('closeModal');
+    const deleteModalOverlay = document.getElementById('deleteModalOverlay');
+    const closeDeleteModal = document.getElementById('closeDeleteModal');
+    const deleteTokenInput = document.getElementById('deleteTokenInput');
+    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
 
+    // 联系方式图标识别
     function getContactIcon(contact) {
       if (/^1\d{10}$/.test(contact)) return '📱';
       if (/^\d{5,11}$/.test(contact)) return '🐧';
@@ -85,11 +110,7 @@
 
     function formatDate(dateStr) {
       const d = new Date(dateStr);
-      const month = (d.getMonth()+1).toString().padStart(2,'0');
-      const day = d.getDate().toString().padStart(2,'0');
-      const hour = d.getHours().toString().padStart(2,'0');
-      const min = d.getMinutes().toString().padStart(2,'0');
-      return month+'-'+day+' '+hour+':'+min;
+      return `${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
     }
 
     function setLoading(show) {
@@ -98,6 +119,7 @@
       if (show) dataContainer.innerHTML = '';
     }
 
+    // 加载数据
     async function fetchData() {
       setLoading(true);
       const tableName = currentTab === 'lost' ? 'lost_found' : 'second_hand';
@@ -113,6 +135,7 @@
       setLoading(false);
     }
 
+    // 渲染卡片（增加删除按钮）
     function renderCards(items) {
       dataContainer.innerHTML = '';
       if (!items || items.length === 0) {
@@ -133,6 +156,7 @@
           tag.innerText = '已售出';
           card.appendChild(tag);
         }
+
         const typeTag = document.createElement('div');
         typeTag.className = 'card-type';
         typeTag.innerText = currentTab === 'lost' ? item.type : (item.category || '未分类');
@@ -178,11 +202,25 @@
           img.style.objectFit = 'cover';
           card.appendChild(img);
         }
+
+        // 删除按钮区域
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'card-actions';
+        const delBtn = document.createElement('button');
+        delBtn.className = 'delete-card-btn';
+        delBtn.innerText = '🗑 删除';
+        delBtn.addEventListener('click', () => {
+          openDeleteDialog(item.id);
+        });
+        actionsDiv.appendChild(delBtn);
+        card.appendChild(actionsDiv);
+
         grid.appendChild(card);
       });
       dataContainer.appendChild(grid);
     }
 
+    // 打开发布表单
     function renderForm() {
       publishForm.innerHTML = '';
       if (currentTab === 'lost') {
@@ -196,6 +234,9 @@
           <div class="form-group"><label>联系人 *</label><input type="text" name="contact_name" required></div>
           <div class="form-group"><label>联系方式 *</label><input type="text" name="contact_info" required></div>
           <div class="form-group"><label>图片链接（可选）</label><input type="url" name="image_url"></div>
+          <div class="form-group"><label>删除密码 *</label><input type="text" name="delete_token" required placeholder="设置一个密码，用于以后删除此信息">
+            <div class="hint">请牢记此密码，删除时需要用到</div>
+          </div>
           <button type="submit" class="submit-btn">提交发布</button>
         `;
       } else {
@@ -209,11 +250,15 @@
           <div class="form-group"><label>联系人 *</label><input type="text" name="contact_name" required></div>
           <div class="form-group"><label>联系方式 *</label><input type="text" name="contact_info" required></div>
           <div class="form-group"><label>图片链接（可选）</label><input type="url" name="image_url"></div>
+          <div class="form-group"><label>删除密码 *</label><input type="text" name="delete_token" required placeholder="设置一个密码，用于以后删除此信息">
+            <div class="hint">请牢记此密码，删除时需要用到</div>
+          </div>
           <button type="submit" class="submit-btn">提交发布</button>
         `;
       }
     }
 
+    // 提交发布
     publishForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const formData = new FormData(publishForm);
@@ -227,7 +272,8 @@
           occurred_at: formData.get('occurred_at') ? new Date(formData.get('occurred_at')).toISOString() : null,
           contact_name: formData.get('contact_name'),
           contact_info: formData.get('contact_info'),
-          image_url: formData.get('image_url') || null
+          image_url: formData.get('image_url') || null,
+          delete_token: formData.get('delete_token')
         };
       } else {
         newData = {
@@ -239,11 +285,13 @@
           contact_name: formData.get('contact_name'),
           contact_info: formData.get('contact_info'),
           image_url: formData.get('image_url') || null,
-          is_sold: false
+          is_sold: false,
+          delete_token: formData.get('delete_token')
         };
       }
       const tableName = currentTab === 'lost' ? 'lost_found' : 'second_hand';
       const { error } = await supabaseClient.from(tableName).insert([newData]);
+
       if (error) {
         alert('发布失败：' + error.message);
         return;
@@ -257,6 +305,52 @@
     modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) closeModal(); });
     publishBtn.addEventListener('click', () => { renderForm(); modalOverlay.style.display = 'flex'; });
 
+    // ---------- 删除功能 ----------
+    function openDeleteDialog(itemId) {
+      pendingDeleteItemId = itemId;
+      deleteTokenInput.value = '';
+      deleteModalOverlay.style.display = 'flex';
+    }
+
+    function closeDeleteDialog() {
+      deleteModalOverlay.style.display = 'none';
+      pendingDeleteItemId = null;
+    }
+
+    closeDeleteModal.addEventListener('click', closeDeleteDialog);
+    deleteModalOverlay.addEventListener('click', (e) => {
+      if (e.target === deleteModalOverlay) closeDeleteDialog();
+    });
+
+    confirmDeleteBtn.addEventListener('click', async () => {
+      const token = deleteTokenInput.value.trim();
+      if (!token) {
+        alert('请输入删除密码');
+        return;
+      }
+      if (!pendingDeleteItemId) return;
+
+      const functionName = currentTab === 'lost' ? 'delete_lost_item' : 'delete_trade_item';
+      const { data, error } = await supabaseClient.rpc(functionName, {
+        item_id: pendingDeleteItemId,
+        token: token
+      });
+
+      if (error) {
+        alert('删除失败：' + error.message);
+        return;
+      }
+
+      if (data === true) {
+        alert('删除成功！');
+        closeDeleteDialog();
+        fetchData(); // 刷新列表
+      } else {
+        alert('密码错误或信息不存在，删除失败');
+      }
+    });
+
+    // 标签切换
     function switchTab(tab) {
       if (currentTab === tab) return;
       currentTab = tab;
@@ -267,6 +361,7 @@
     tabLost.addEventListener('click', () => switchTab('lost'));
     tabTrade.addEventListener('click', () => switchTab('trade'));
 
+    // 初始加载
     fetchData();
   </script>
 </body>
