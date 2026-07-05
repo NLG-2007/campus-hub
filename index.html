@@ -353,17 +353,6 @@
   </div>
 </div>
 
-<!-- 删除密码弹窗 -->
-<div class="modal-overlay" id="deleteModalOverlay">
-  <div class="modal">
-    <button class="close-btn" id="closeDeleteModal">&times;</button>
-    <h2 style="text-align:center; margin-bottom:12px;">🔐 删除信息</h2>
-    <p style="text-align:center; margin-bottom:16px; color:#555;">请输入发布时设置的删除密码</p>
-    <input type="password" id="deleteTokenInput" placeholder="删除密码" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:10px; margin-bottom:12px;">
-    <button id="confirmDeleteBtn" class="submit-btn">确认删除</button>
-  </div>
-</div>
-
 <!-- 详情弹窗 -->
 <div class="modal-overlay" id="detailModalOverlay">
   <div class="modal">
@@ -409,7 +398,6 @@
   // ============================================================
   let currentUser = null;
   let currentTab = 'lost';
-  let pendingDeleteItem = null;
 
   // DOM 引用
   const tabLost = document.getElementById('tab-lost');
@@ -424,10 +412,6 @@
   const modalTitle = document.getElementById('modalTitle');
   const publishForm = document.getElementById('publishForm');
   const closeModalBtn = document.getElementById('closeModal');
-  const deleteModalOverlay = document.getElementById('deleteModalOverlay');
-  const closeDeleteModal = document.getElementById('closeDeleteModal');
-  const deleteTokenInput = document.getElementById('deleteTokenInput');
-  const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
   const detailModalOverlay = document.getElementById('detailModalOverlay');
   const closeDetailModal = document.getElementById('closeDetailModal');
   const detailTitle = document.getElementById('detailTitle');
@@ -607,7 +591,7 @@
   }
 
   // ============================================================
-  //  5. 渲染卡片
+  //  5. 渲染卡片（删除按钮仅在“我的发布”中显示）
   // ============================================================
   function renderCards(items, isMine = false) {
     dataContainer.innerHTML = '';
@@ -730,20 +714,20 @@
       timeSpan.innerText = `📅 ${formatDate(item.created_at)}`;
       footer.appendChild(timeSpan);
 
-      const delBtn = document.createElement('button');
-      delBtn.className = 'delete-card-btn';
-      delBtn.innerText = '🗑 删除';
-      delBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (currentUser && item.user_id === currentUser.id) {
+      // ========== 只有“我的发布”才显示删除按钮 ==========
+      if (isMine && currentUser) {
+        const delBtn = document.createElement('button');
+        delBtn.className = 'delete-card-btn';
+        delBtn.innerText = '🗑 删除';
+        delBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
           if (confirm('确定要删除这条信息吗？')) {
             deleteItemDirect(item.id, isLost ? 'lost_found' : 'second_hand');
           }
-        } else {
-          openDeleteDialog(item.id, isLost ? 'lost_found' : 'second_hand');
-        }
-      });
-      footer.appendChild(delBtn);
+        });
+        footer.appendChild(delBtn);
+      }
+
       card.appendChild(footer);
 
       card.addEventListener('click', () => {
@@ -772,65 +756,21 @@
   }
 
   // ============================================================
-  //  7. 删除逻辑
+  //  7. 删除逻辑（仅限本人删除）
   // ============================================================
   async function deleteItemDirect(id, table) {
     try {
-      const { error } = await supabaseClient.from(table).delete().match({ id, user_id: currentUser.id });
+      const { error } = await supabaseClient
+        .from(table)
+        .delete()
+        .match({ id, user_id: currentUser.id });
       if (error) throw error;
       alert('删除成功！');
-      refreshCurrentView();
+      // 刷新我的发布列表
+      fetchMyItems();
     } catch (err) {
       alert('删除失败：' + err.message);
-    }
-  }
-
-  function openDeleteDialog(itemId, table) {
-    pendingDeleteItem = { id: itemId, table };
-    deleteTokenInput.value = '';
-    deleteModalOverlay.style.display = 'flex';
-  }
-
-  function closeDeleteDialog() {
-    deleteModalOverlay.style.display = 'none';
-    pendingDeleteItem = null;
-  }
-  closeDeleteModal.addEventListener('click', closeDeleteDialog);
-  deleteModalOverlay.addEventListener('click', (e) => {
-    if (e.target === deleteModalOverlay) closeDeleteDialog();
-  });
-
-  confirmDeleteBtn.addEventListener('click', async () => {
-    const token = deleteTokenInput.value.trim();
-    if (!token) {
-      alert('请输入删除密码');
-      return;
-    }
-    if (!pendingDeleteItem) return;
-    const { id, table } = pendingDeleteItem;
-    const functionName = table === 'lost_found' ? 'delete_lost_item' : 'delete_trade_item';
-    const { data, error } = await supabaseClient.rpc(functionName, {
-      item_id: id,
-      token: token
-    });
-    if (error) {
-      alert('删除失败：' + error.message);
-      return;
-    }
-    if (data === true) {
-      alert('删除成功！');
-      closeDeleteDialog();
-      refreshCurrentView();
-    } else {
-      alert('密码错误或信息不存在，删除失败');
-    }
-  });
-
-  function refreshCurrentView() {
-    if (currentTab === 'mine') {
-      fetchMyItems();
-    } else {
-      fetchData();
+      console.error('删除错误：', err);
     }
   }
 
@@ -872,7 +812,7 @@
   });
 
   // ============================================================
-  //  9. 发布表单（含图片上传功能）
+  //  9. 发布表单（含图片上传）
   // ============================================================
   function renderForm() {
     publishForm.innerHTML = '';
@@ -886,16 +826,12 @@
         <div class="form-group"><label>时间</label><input type="datetime-local" name="occurred_at"></div>
         <div class="form-group"><label>联系人 *</label><input type="text" name="contact_name" required></div>
         <div class="form-group"><label>联系方式 *</label><input type="text" name="contact_info" required></div>
-        <!-- 图片上传区域 -->
         <div class="form-group">
           <label>上传图片（可选）</label>
           <input type="file" accept="image/*" id="imageUpload">
           <div class="hint">选择图片后自动上传，也可手动填写下方链接</div>
         </div>
         <div class="form-group"><label>图片链接（可选）</label><input type="url" name="image_url" id="imageUrlInput" placeholder="或手动输入图片URL"></div>
-        <div class="form-group"><label>删除密码 *</label><input type="text" name="delete_token" required placeholder="设置一个密码，用于以后删除此信息">
-          <div class="hint">请牢记此密码，删除时需要用到</div>
-        </div>
         <button type="submit" class="submit-btn">提交发布</button>
       `;
     } else {
@@ -908,21 +844,17 @@
         <div class="form-group"><label>成色</label><input type="text" name="condition"></div>
         <div class="form-group"><label>联系人 *</label><input type="text" name="contact_name" required></div>
         <div class="form-group"><label>联系方式 *</label><input type="text" name="contact_info" required></div>
-        <!-- 图片上传区域 -->
         <div class="form-group">
           <label>上传图片（可选）</label>
           <input type="file" accept="image/*" id="imageUpload">
           <div class="hint">选择图片后自动上传，也可手动填写下方链接</div>
         </div>
         <div class="form-group"><label>图片链接（可选）</label><input type="url" name="image_url" id="imageUrlInput" placeholder="或手动输入图片URL"></div>
-        <div class="form-group"><label>删除密码 *</label><input type="text" name="delete_token" required placeholder="设置一个密码，用于以后删除此信息">
-          <div class="hint">请牢记此密码，删除时需要用到</div>
-        </div>
         <button type="submit" class="submit-btn">提交发布</button>
       `;
     }
 
-    // ----- 绑定图片上传事件 -----
+    // 绑定图片上传事件
     const fileInput = document.getElementById('imageUpload');
     const urlInput = document.getElementById('imageUrlInput');
     if (fileInput && urlInput) {
@@ -930,7 +862,6 @@
         const file = e.target.files[0];
         if (!file) return;
 
-        // 限制文件大小 5MB
         if (file.size > 5 * 1024 * 1024) {
           alert('图片大小不能超过 5MB');
           fileInput.value = '';
@@ -946,7 +877,7 @@
           const filePath = `public/${fileName}`;
 
           const { data, error } = await supabaseClient.storage
-            .from('images')   // 确保 bucket 名称为 'images'，如果不同请修改
+            .from('images')
             .upload(filePath, file, {
               cacheControl: '3600',
               upsert: false
@@ -958,8 +889,7 @@
             .from('images')
             .getPublicUrl(filePath);
 
-          const publicUrl = urlData.publicUrl;
-          urlInput.value = publicUrl;
+          urlInput.value = urlData.publicUrl;
           urlInput.placeholder = '图片已上传，URL自动填入';
           alert('✅ 图片上传成功！');
         } catch (err) {
@@ -971,7 +901,6 @@
     }
   }
 
-  // 提交发布（保持不变，但会使用 image_url 字段）
   publishForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!currentUser) {
@@ -990,7 +919,6 @@
         contact_name: formData.get('contact_name'),
         contact_info: formData.get('contact_info'),
         image_url: formData.get('image_url') || null,
-        delete_token: formData.get('delete_token'),
         user_id: currentUser.id
       };
     } else {
@@ -1004,7 +932,6 @@
         contact_info: formData.get('contact_info'),
         image_url: formData.get('image_url') || null,
         is_sold: false,
-        delete_token: formData.get('delete_token'),
         user_id: currentUser.id
       };
     }
@@ -1035,7 +962,18 @@
   });
 
   // ============================================================
-  //  10. 标签切换
+  //  10. 刷新当前视图
+  // ============================================================
+  function refreshCurrentView() {
+    if (currentTab === 'mine') {
+      fetchMyItems();
+    } else {
+      fetchData();
+    }
+  }
+
+  // ============================================================
+  //  11. 标签切换
   // ============================================================
   function switchTab(tab) {
     if (currentTab === tab) return;
@@ -1057,7 +995,7 @@
   tabMine.addEventListener('click', () => switchTab('mine'));
 
   // ============================================================
-  //  11. 初始化加载
+  //  12. 初始化加载
   // ============================================================
   fetchData();
 </script>
