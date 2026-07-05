@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>校园云平台</title>
+  <!-- 引入 Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    /* ========== 全局样式 ========== */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: #f5f7fb;
+      color: #333;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px 16px;
+    }
+
+    /* 顶部标题 */
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .header h1 {
+      font-size: 28px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* 标签切换按钮 */
+    .tabs {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .tab-btn {
+      padding: 10px 28px;
+      border: none;
+      background: white;
+      border-radius: 30px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      transition: all 0.2s;
+      color: #555;
+    }
+    .tab-btn.active {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    /* 发布按钮 */
+    .publish-area {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .publish-btn {
+      padding: 12px 32px;
+      background: white;
+      border: 2px dashed #764ba2;
+      border-radius: 30px;
+      font-size: 15px;
+      color: #764ba2;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: white;
+    }
+    .publish-btn:hover {
+      background: #764ba2;
+      color: white;
+      border-color: #764ba2;
+    }
+
+    /* 加载动画 */
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #999;
+    }
+    .loading::after {
+      content: "";
+      display: inline-block;
+      width: 30px;
+      height: 30px;
+      margin-left: 12px;
+      border: 3px solid #ddd;
+      border-top-color: #667eea;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* 卡片网格 */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+    @media (min-width: 600px) {
+      .cards-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    /* 卡片样式 */
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      transition: transform 0.15s, opacity 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+    .card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+    }
+
+    /* 已售出状态 */
+    .card.sold {
+      opacity: 0.55;
+    }
+    .sold-tag {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: #e74c3c;
+      color: white;
+      font-size: 12px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-weight: 600;
+      pointer-events: none;
+    }
+
+    .card-type {
+      display: inline-block;
+      background: #f0f3ff;
+      color: #667eea;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 2px 10px;
+      border-radius: 12px;
+      margin-bottom: 8px;
+    }
+    .card-item-name {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: #222;
+    }
+    .card-desc {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 8px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .card-meta {
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 8px;
+    }
+    .card-meta span {
+      margin-right: 12px;
+      white-space: nowrap;
+    }
+    .card-contact {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #444;
+    }
+    .contact-icon {
+      font-size: 18px;
+    }
+
+    /* 弹窗 Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+    .modal {
+      background: white;
+      border-radius: 20px;
+      padding: 24px;
+      width: 100%;
+      max-width: 450px;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      position: relative;
+    }
+    .modal h2 {
+      margin-bottom: 18px;
+      text-align: center;
+      color: #333;
+    }
+    .close-btn {
+      position: absolute;
+      top: 12px; right: 16px;
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #aaa;
+    }
+    .form-group {
+      margin-bottom: 14px;
+    }
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 4px;
+      font-size: 14px;
+      color: #555;
+    }
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      font-size: 14px;
+      transition: border 0.2s;
+    }
+    .form-group input:focus,
+    .form-group textarea:focus {
+      border-color: #667eea;
+      outline: none;
+    }
+    .submit-btn {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border: none;
+      border-radius: 30px;
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🏫 校园云平台</h1>
+    </div>
+
+    <!-- 标签切换 -->
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-lost">🔍 失物招领</button>
+      <button class="tab-btn" id="tab-trade">💸 二手交易</button>
+    </div>
+
+    <!-- 发布按钮 -->
+    <div class="publish-area">
+      <button class="publish-btn" id="publishBtn">✚ 发布信息</button>
+    </div>
+
+    <!-- 数据展示区 -->
+    <div id="data-container"></div>
+
+    <!-- 加载动画 -->
+    <div class="loading" id="loading" style="display: none;">加载中</div>
+
+    <!-- 空状态 -->
+    <div id="empty-state" style="text-align: center; padding: 40px; color: #999; display: none;">
+      还没有任何信息，快成为第一个发布的人吧～
+    </div>
+  </div>
+
+  <!-- 发布信息弹窗 -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal" id="modalForm">
+      <button class="close-btn" id="closeModal">&times;</button>
+      <h2 id="modalTitle">发布信息</h2>
+      <form id="publishForm">
+        <!-- 动态表单内容将由 JS 生成 -->
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // ==================== 配置 Supabase ====================
+    // ⚠️ 请替换为你的实际 Supabase URL 和 anon key
+    const SUPABASE_URL = "https://dyxwpojykuruehabhanj.supabase.co/rest/v1/";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5eHdwb2p5a3VydWVoYWJoYW5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMzE2OTQsImV4cCI6MjA5ODgwNzY5NH0.FNxPejr--ewQvRDaU5FHIkv8-etpC05gH7Pn9CpP-cc";
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ==================== 全局状态 ====================
+    let currentTab = 'lost'; // 'lost' 或 'trade'
+
+    // ==================== DOM 元素 ====================
+    const tabLost = document.getElementById('tab-lost');
+    const tabTrade = document.getElementById('tab-trade');
+    const publishBtn = document.getElementById('publishBtn');
+    const dataContainer = document.getElementById('data-container');
+    const loadingEl = document.getElementById('loading');
+    const emptyState = document.getElementById('empty-state');
+    const modalOverlay = document.getElementById('modalOverlay');
+    const modalTitle = document.getElementById('modalTitle');
+    const publishForm = document.getElementById('publishForm');
+    const closeModalBtn = document.getElementById('closeModal');
+
+    // ==================== 工具函数 ====================
+    // 判断联系方式类型并返回图标
+    function getContactIcon(contact) {
+      const str = contact.trim();
+      // 手机号：1开头的11位数字
+      if (/^1\d{10}$/.test(str)) {
+        return '📱'; // 手机
+      }
+      // QQ号：5-11位数字，通常不以1开头，但不绝对，这里简单判断长度和数字
+      if (/^\d{5,11}$/.test(str)) {
+        return '🐧'; // QQ
+      }
+      // 微信号：字母开头，可包含字母、数字、下划线、减号，长度>=6
+      if (/^[a-zA-Z][a-zA-Z0-9_-]{5,}$/.test(str) || str.startsWith('wxid_')) {
+        return '💬'; // 微信
+      }
+      // 其他情况统一用联系方式图标
+      return '📞';
+    }
+
+    // 格式化日期
+    function formatDate(dateStr) {
+      const d = new Date(dateStr);
+      const month = (d.getMonth() + 1).toString().padStart(2, '0');
+      const day = d.getDate().toString().padStart(2, '0');
+      const hour = d.getHours().toString().padStart(2, '0');
+      const min = d.getMinutes().toString().padStart(2, '0');
+      return `${month}-${day} ${hour}:${min}`;
+    }
+
+    // 显示/隐藏加载状态
+    function setLoading(show) {
+      loadingEl.style.display = show ? 'block' : 'none';
+      emptyState.style.display = 'none';
+      if (show) dataContainer.innerHTML = '';
+    }
+
+    // ==================== 加载数据 ====================
+    async function fetchData() {
+      setLoading(true);
+      let tableName = currentTab === 'lost' ? 'lost_found' : 'second_hand';
+      let query = supabase.from(tableName).select('*').order('created_at', { ascending: false });
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('获取数据失败：', error);
+        dataContainer.innerHTML = '<p style="text-align:center;color:red;">数据加载失败，请检查控制台。</p>';
+        setLoading(false);
+        return;
+      }
+
+      renderCards(data);
+      setLoading(false);
+    }
+
+    // ==================== 渲染卡片 ====================
+    function renderCards(items) {
+      dataContainer.innerHTML = '';
+      if (!items || items.length === 0) {
+        emptyState.style.display = 'block';
+        return;
+      }
+      emptyState.style.display = 'none';
+
+      const grid = document.createElement('div');
+      grid.className = 'cards-grid';
+
+      items.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'card';
+
+        // 二手交易且已售出
+        if (currentTab === 'trade' && item.is_sold) {
+          card.classList.add('sold');
+          const soldTag = document.createElement('div');
+          soldTag.className = 'sold-tag';
+          soldTag.innerText = '已售出';
+          card.appendChild(soldTag);
+        }
+
+        // 类型标签（失物招领显示丢失/招领，二手显示分类）
+        let typeTagText = '';
+        if (currentTab === 'lost') {
+          typeTagText = item.type;
+        } else {
+          typeTagText = item.category || '未分类';
+        }
+        const typeTag = document.createElement('div');
+        typeTag.className = 'card-type';
+        typeTag.innerText = typeTagText;
+        card.appendChild(typeTag);
+
+        // 物品名称
+        const nameEl = document.createElement('div');
+        nameEl.className = 'card-item-name';
+        nameEl.innerText = item.item_name;
+        card.appendChild(nameEl);
+
+        // 描述
+        if (item.description) {
+          const descEl = document.createElement('div');
+          descEl.className = 'card-desc';
+          descEl.innerText = item.description;
+          card.appendChild(descEl);
+        }
+
+        // 元信息：地点、时间、价格（二手）等
+        const metaDiv = document.createElement('div');
+        metaDiv.className = 'card-meta';
+        let metaHtml = '';
+        if (item.location) metaHtml += `<span>📍 ${item.location}</span>`;
+        if (item.occurred_at) metaHtml += `<span>🕒 ${formatDate(item.occurred_at)}</span>`;
+        if (currentTab === 'trade') {
+          if (item.price) metaHtml += `<span>💰 ${item.price}</span>`;
+          if (item.condition) metaHtml += `<span>⭐ ${item.condition}</span>`;
+        }
+        metaHtml += `<span>📅 ${formatDate(item.created_at)}</span>`;
+        metaDiv.innerHTML = metaHtml;
+        card.appendChild(metaDiv);
+
+        // 联系人及联系方式
+        const contactDiv = document.createElement('div');
+        contactDiv.className = 'card-contact';
+        const icon = getContactIcon(item.contact_info);
+        contactDiv.innerHTML = `<span class="contact-icon">${icon}</span> <strong>${item.contact_name || '匿名'}</strong> <span style="margin-left:6px;color:#555;">${item.contact_info}</span>`;
+        card.appendChild(contactDiv);
+
+        // 图片（如果有）
+        if (item.image_url) {
+          const img = document.createElement('img');
+          img.src = item.image_url;
+          img.alt = '图片';
+          img.style.width = '100%';
+          img.style.marginTop = '10px';
+          img.style.borderRadius = '8px';
+          img.style.maxHeight = '150px';
+          img.style.objectFit = 'cover';
+          card.appendChild(img);
+        }
+
+        grid.appendChild(card);
+      });
+
+      dataContainer.appendChild(grid);
+    }
+
+    // ==================== 表单生成与提交 ====================
+    function renderForm() {
+      publishForm.innerHTML = '';
+      if (currentTab === 'lost') {
+        modalTitle.innerText = '发布失物招领';
+        publishForm.innerHTML = `
+          <div class="form-group"><label>物品名称 *</label><input type="text" name="item_name" required></div>
+          <div class="form-group"><label>类型 *</label>
+            <select name="type" required>
+              <option value="丢失">丢失</option>
+              <option value="招领">招领</option>
+            </select>
+          </div>
+          <div class="form-group"><label>描述</label><textarea name="description" rows="2"></textarea></div>
+          <div class="form-group"><label>地点</label><input type="text" name="location"></div>
+          <div class="form-group"><label>时间</label><input type="datetime-local" name="occurred_at"></div>
+          <div class="form-group"><label>联系人 *</label><input type="text" name="contact_name" required></div>
+          <div class="form-group"><label>联系方式 *</label><input type="text" name="contact_info" placeholder="手机/QQ/微信" required></div>
+          <div class="form-group"><label>图片链接（可选）</label><input type="url" name="image_url" placeholder="https://..."></div>
+          <button type="submit" class="submit-btn">提交发布</button>
+        `;
+      } else {
+        modalTitle.innerText = '发布二手交易';
+        publishForm.innerHTML = `
+          <div class="form-group"><label>商品名称 *</label><input type="text" name="item_name" required></div>
+          <div class="form-group"><label>分类 *</label>
+            <select name="category" required>
+              <option value="教材">教材</option>
+              <option value="数码">数码</option>
+              <option value="生活用品">生活用品</option>
+              <option value="服饰">服饰</option>
+              <option value="其他">其他</option>
+            </select>
+          </div>
+          <div class="form-group"><label>价格</label><input type="text" name="price" placeholder="如：50元 或 免费"></div>
+          <div class="form-group"><label>描述</label><textarea name="description" rows="2"></textarea></div>
+          <div class="form-group"><label>成色</label><input type="text" name="condition" placeholder="如：九成新"></div>
+          <div class="form-group"><label>联系人 *</label><input type="text" name="contact_name" required></div>
+          <div class="form-group"><label>联系方式 *</label><input type="text" name="contact_info" placeholder="手机/QQ/微信" required></div>
+          <div class="form-group"><label>图片链接（可选）</label><input type="url" name="image_url" placeholder="https://..."></div>
+          <button type="submit" class="submit-btn">提交发布</button>
+        `;
+      }
+    }
+
+    // 提交表单
+    publishForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(publishForm);
+      let newData = {};
+
+      if (currentTab === 'lost') {
+        newData = {
+          item_name: formData.get('item_name'),
+          type: formData.get('type'),
+          description: formData.get('description') || null,
+          location: formData.get('location') || null,
+          occurred_at: formData.get('occurred_at') ? new Date(formData.get('occurred_at')).toISOString() : null,
+          contact_name: formData.get('contact_name'),
+          contact_info: formData.get('contact_info'),
+          image_url: formData.get('image_url') || null,
+        };
+      } else {
+        newData = {
+          item_name: formData.get('item_name'),
+          category: formData.get('category'),
+          price: formData.get('price') || null,
+          description: formData.get('description') || null,
+          condition: formData.get('condition') || null,
+          contact_name: formData.get('contact_name'),
+          contact_info: formData.get('contact_info'),
+          image_url: formData.get('image_url') || null,
+          is_sold: false, // 默认未售出
+        };
+      }
+
+      const tableName = currentTab === 'lost' ? 'lost_found' : 'second_hand';
+      const { error } = await supabase.from(tableName).insert([newData]);
+
+      if (error) {
+        alert('发布失败：' + error.message);
+        return;
+      }
+
+      closeModal();
+      fetchData(); // 刷新列表
+    });
+
+    // 关闭模态框
+    function closeModal() {
+      modalOverlay.style.display = 'none';
+    }
+    closeModalBtn.addEventListener('click', closeModal);
+    modalOverlay.addEventListener('click', (e) => {
+      if (e.target === modalOverlay) closeModal();
+    });
+
+    // 打开模态框（发布按钮）
+    publishBtn.addEventListener('click', () => {
+      renderForm();
+      modalOverlay.style.display = 'flex';
+    });
+
+    // ==================== 标签切换 ====================
+    function switchTab(tab) {
+      if (currentTab === tab) return;
+      currentTab = tab;
+      // 更新按钮样式
+      tabLost.classList.remove('active');
+      tabTrade.classList.remove('active');
+      if (tab === 'lost') tabLost.classList.add('active');
+      else tabTrade.classList.add('active');
+      // 重新加载数据
+      fetchData();
+    }
+
+    tabLost.addEventListener('click', () => switchTab('lost'));
+    tabTrade.addEventListener('click', () => switchTab('trade'));
+
+    // ==================== 初始加载 ====================
+    fetchData();
+  </script>
+</body>
+</html>
