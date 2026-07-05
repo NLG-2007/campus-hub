@@ -402,7 +402,6 @@
   const SUPABASE_URL = "https://dyxwpojykuruehabhanj.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5eHdwb2p5a3VydWVoYWJoYW5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMzE2OTQsImV4cCI6MjA5ODgwNzY5NH0.FNxPejr--ewQvRDaU5FHIkv8-etpC05gH7Pn9CpP-cc";
 
-  // 注意：这里使用 supabaseClient 作为变量名，避免与全局 supabase 冲突
   const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   // ============================================================
@@ -873,7 +872,7 @@
   });
 
   // ============================================================
-  //  9. 发布表单
+  //  9. 发布表单（含图片上传功能）
   // ============================================================
   function renderForm() {
     publishForm.innerHTML = '';
@@ -887,7 +886,13 @@
         <div class="form-group"><label>时间</label><input type="datetime-local" name="occurred_at"></div>
         <div class="form-group"><label>联系人 *</label><input type="text" name="contact_name" required></div>
         <div class="form-group"><label>联系方式 *</label><input type="text" name="contact_info" required></div>
-        <div class="form-group"><label>图片链接（可选）</label><input type="url" name="image_url"></div>
+        <!-- 图片上传区域 -->
+        <div class="form-group">
+          <label>上传图片（可选）</label>
+          <input type="file" accept="image/*" id="imageUpload">
+          <div class="hint">选择图片后自动上传，也可手动填写下方链接</div>
+        </div>
+        <div class="form-group"><label>图片链接（可选）</label><input type="url" name="image_url" id="imageUrlInput" placeholder="或手动输入图片URL"></div>
         <div class="form-group"><label>删除密码 *</label><input type="text" name="delete_token" required placeholder="设置一个密码，用于以后删除此信息">
           <div class="hint">请牢记此密码，删除时需要用到</div>
         </div>
@@ -903,15 +908,70 @@
         <div class="form-group"><label>成色</label><input type="text" name="condition"></div>
         <div class="form-group"><label>联系人 *</label><input type="text" name="contact_name" required></div>
         <div class="form-group"><label>联系方式 *</label><input type="text" name="contact_info" required></div>
-        <div class="form-group"><label>图片链接（可选）</label><input type="url" name="image_url"></div>
+        <!-- 图片上传区域 -->
+        <div class="form-group">
+          <label>上传图片（可选）</label>
+          <input type="file" accept="image/*" id="imageUpload">
+          <div class="hint">选择图片后自动上传，也可手动填写下方链接</div>
+        </div>
+        <div class="form-group"><label>图片链接（可选）</label><input type="url" name="image_url" id="imageUrlInput" placeholder="或手动输入图片URL"></div>
         <div class="form-group"><label>删除密码 *</label><input type="text" name="delete_token" required placeholder="设置一个密码，用于以后删除此信息">
           <div class="hint">请牢记此密码，删除时需要用到</div>
         </div>
         <button type="submit" class="submit-btn">提交发布</button>
       `;
     }
+
+    // ----- 绑定图片上传事件 -----
+    const fileInput = document.getElementById('imageUpload');
+    const urlInput = document.getElementById('imageUrlInput');
+    if (fileInput && urlInput) {
+      fileInput.addEventListener('change', async function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // 限制文件大小 5MB
+        if (file.size > 5 * 1024 * 1024) {
+          alert('图片大小不能超过 5MB');
+          fileInput.value = '';
+          return;
+        }
+
+        urlInput.placeholder = '正在上传...';
+        urlInput.value = '';
+
+        try {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+          const filePath = `public/${fileName}`;
+
+          const { data, error } = await supabaseClient.storage
+            .from('images')   // 确保 bucket 名称为 'images'，如果不同请修改
+            .upload(filePath, file, {
+              cacheControl: '3600',
+              upsert: false
+            });
+
+          if (error) throw error;
+
+          const { data: urlData } = supabaseClient.storage
+            .from('images')
+            .getPublicUrl(filePath);
+
+          const publicUrl = urlData.publicUrl;
+          urlInput.value = publicUrl;
+          urlInput.placeholder = '图片已上传，URL自动填入';
+          alert('✅ 图片上传成功！');
+        } catch (err) {
+          alert('图片上传失败：' + err.message);
+          urlInput.placeholder = '可手动输入图片链接';
+          urlInput.value = '';
+        }
+      });
+    }
   }
 
+  // 提交发布（保持不变，但会使用 image_url 字段）
   publishForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!currentUser) {
