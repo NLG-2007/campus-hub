@@ -318,7 +318,7 @@
     const SUPABASE_URL = "https://dyxwpojykuruehabhanj.supabase.co/rest/v1/";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5eHdwb2p5a3VydWVoYWJoYW5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMzE2OTQsImV4cCI6MjA5ODgwNzY5NH0.FNxPejr--ewQvRDaU5FHIkv8-etpC05gH7Pn9CpP-cc";
 
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // ==================== 全局状态 ====================
     let currentTab = 'lost'; // 'lost' 或 'trade'
@@ -376,16 +376,15 @@
     async function fetchData() {
       setLoading(true);
       let tableName = currentTab === 'lost' ? 'lost_found' : 'second_hand';
-      let query = supabase.from(tableName).select('*').order('created_at', { ascending: false });
-
+      let query = supabaseClient.from(tableName).select('*').order('created_at', { ascending: false });
+      console.log('实际请求路径：', `rest/v1/${tableName}`);
       const { data, error } = await query;
 
-      if (error) {
-        console.error('获取数据失败：', error);
-        dataContainer.innerHTML = '<p style="text-align:center;color:red;">数据加载失败，请检查控制台。</p>';
-        setLoading(false);
-        return;
-      }
+     if (error) {
+  alert('数据加载失败：' + error.message + ' (详情见控制台)');
+  console.error(error);
+  ...
+}
 
       renderCards(data);
       setLoading(false);
@@ -559,7 +558,7 @@
       }
 
       const tableName = currentTab === 'lost' ? 'lost_found' : 'second_hand';
-      const { error } = await supabase.from(tableName).insert([newData]);
+      const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
       if (error) {
         alert('发布失败：' + error.message);
