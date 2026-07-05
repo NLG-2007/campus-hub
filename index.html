@@ -6,7 +6,6 @@
   <title>校园云平台</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    /* ----- 全局重置 ----- */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -15,7 +14,6 @@
     }
     .container { max-width: 800px; margin: 0 auto; padding: 20px 16px; }
 
-    /* ----- 头部和认证区域 ----- */
     .header { text-align: center; margin-bottom: 8px; }
     .header h1 { font-size: 28px; background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     #auth-area {
@@ -50,7 +48,6 @@
     }
     #auth-area .user-info button:hover { background: #f0f0f0; }
 
-    /* ----- 选项卡 ----- */
     .tabs {
       display: flex;
       justify-content: center;
@@ -69,18 +66,9 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.06);
       transition: 0.2s;
     }
-    .tab-btn#tab-lost.active {
-      background: linear-gradient(135deg, #f39c12, #e67e22);
-      color: white;
-    }
-    .tab-btn#tab-trade.active {
-      background: linear-gradient(135deg, #27ae60, #2ecc71);
-      color: white;
-    }
-    .tab-btn#tab-mine.active {
-      background: linear-gradient(135deg, #8e44ad, #9b59b6);
-      color: white;
-    }
+    .tab-btn#tab-lost.active { background: linear-gradient(135deg, #f39c12, #e67e22); color: white; }
+    .tab-btn#tab-trade.active { background: linear-gradient(135deg, #27ae60, #2ecc71); color: white; }
+    .tab-btn#tab-mine.active { background: linear-gradient(135deg, #8e44ad, #9b59b6); color: white; }
 
     .publish-area { text-align: center; margin-bottom: 20px; }
     .publish-btn {
@@ -98,7 +86,6 @@
 
     .loading { text-align: center; padding: 40px; color: #999; display: none; }
 
-    /* ----- 卡片网格 ----- */
     .cards-grid {
       display: grid;
       grid-template-columns: 1fr;
@@ -123,31 +110,13 @@
       box-shadow: 0 8px 24px rgba(0,0,0,0.10);
     }
 
-    .card-lost {
-      border-left-color: #f39c12;
-      background: #fffbf5;
-    }
-    .card-lost .card-type-badge {
-      background: #f39c12;
-      color: white;
-    }
-    .card-lost .highlight-field {
-      color: #d68910;
-      font-weight: 600;
-    }
+    .card-lost { border-left-color: #f39c12; background: #fffbf5; }
+    .card-lost .card-type-badge { background: #f39c12; color: white; }
+    .card-lost .highlight-field { color: #d68910; font-weight: 600; }
 
-    .card-trade {
-      border-left-color: #27ae60;
-      background: #f5fff7;
-    }
-    .card-trade .card-type-badge {
-      background: #27ae60;
-      color: white;
-    }
-    .card-trade .highlight-field {
-      color: #1e8449;
-      font-weight: 600;
-    }
+    .card-trade { border-left-color: #27ae60; background: #f5fff7; }
+    .card-trade .card-type-badge { background: #27ae60; color: white; }
+    .card-trade .highlight-field { color: #1e8449; font-weight: 600; }
     .card.sold { opacity: 0.6; }
 
     .card-type-badge {
@@ -158,17 +127,8 @@
       border-radius: 20px;
       margin-bottom: 8px;
     }
-    .card-item-name {
-      font-size: 18px;
-      font-weight: 700;
-      margin-bottom: 4px;
-    }
-    .card-desc {
-      font-size: 14px;
-      color: #666;
-      margin-bottom: 6px;
-      line-height: 1.4;
-    }
+    .card-item-name { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+    .card-desc { font-size: 14px; color: #666; margin-bottom: 6px; line-height: 1.4; }
     .highlight-row {
       font-size: 14px;
       margin-bottom: 6px;
@@ -190,10 +150,7 @@
       align-items: center;
       margin-top: 10px;
     }
-    .card-footer .time {
-      font-size: 12px;
-      color: #aaa;
-    }
+    .card-footer .time { font-size: 12px; color: #aaa; }
     .delete-card-btn {
       background: none;
       border: 1px solid #e74c3c;
@@ -204,10 +161,7 @@
       cursor: pointer;
       transition: 0.2s;
     }
-    .delete-card-btn:hover {
-      background: #e74c3c;
-      color: white;
-    }
+    .delete-card-btn:hover { background: #e74c3c; color: white; }
     .card img {
       width: 100%;
       margin-top: 10px;
@@ -227,7 +181,6 @@
       font-weight: 600;
     }
 
-    /* ----- 弹窗通用 ----- */
     .modal-overlay {
       display: none;
       position: fixed;
@@ -299,9 +252,7 @@
     }
     .submit-btn:hover { opacity: 0.9; }
 
-    #detail-content .detail-field {
-      margin-bottom: 10px;
-    }
+    #detail-content .detail-field { margin-bottom: 10px; }
     #detail-content .detail-field strong {
       display: inline-block;
       width: 80px;
@@ -714,7 +665,7 @@
       timeSpan.innerText = `📅 ${formatDate(item.created_at)}`;
       footer.appendChild(timeSpan);
 
-      // ========== 只有“我的发布”才显示删除按钮 ==========
+      // 只有“我的发布”才显示删除按钮
       if (isMine && currentUser) {
         const delBtn = document.createElement('button');
         delBtn.className = 'delete-card-btn';
@@ -756,21 +707,27 @@
   }
 
   // ============================================================
-  //  7. 删除逻辑（仅限本人删除）
+  //  7. 删除逻辑（仅限本人，带返回检查）
   // ============================================================
   async function deleteItemDirect(id, table) {
     try {
-      const { error } = await supabaseClient
+      const { data, error } = await supabaseClient
         .from(table)
-        .delete()
+        .delete({ returning: 'representation' })
         .match({ id, user_id: currentUser.id });
+
       if (error) throw error;
+
+      if (!data || data.length === 0) {
+        alert('删除失败：未找到匹配的记录，请确认你是发布者且已登录。');
+        return;
+      }
+
       alert('删除成功！');
-      // 刷新我的发布列表
-      fetchMyItems();
+      fetchMyItems(); // 刷新我的发布
     } catch (err) {
       alert('删除失败：' + err.message);
-      console.error('删除错误：', err);
+      console.error('删除错误详情：', err);
     }
   }
 
@@ -812,7 +769,7 @@
   });
 
   // ============================================================
-  //  9. 发布表单（含图片上传）
+  //  9. 发布表单（含图片上传，带详细错误提示）
   // ============================================================
   function renderForm() {
     publishForm.innerHTML = '';
@@ -854,7 +811,7 @@
       `;
     }
 
-    // 绑定图片上传事件
+    // 绑定图片上传事件（增强错误提示）
     const fileInput = document.getElementById('imageUpload');
     const urlInput = document.getElementById('imageUrlInput');
     if (fileInput && urlInput) {
@@ -883,7 +840,13 @@
               upsert: false
             });
 
-          if (error) throw error;
+          if (error) {
+            console.error('上传错误：', error);
+            alert('图片上传失败：' + error.message + '\n请检查存储桶权限或网络');
+            urlInput.placeholder = '可手动输入图片链接';
+            urlInput.value = '';
+            return;
+          }
 
           const { data: urlData } = supabaseClient.storage
             .from('images')
@@ -893,7 +856,8 @@
           urlInput.placeholder = '图片已上传，URL自动填入';
           alert('✅ 图片上传成功！');
         } catch (err) {
-          alert('图片上传失败：' + err.message);
+          console.error('上传异常：', err);
+          alert('图片上传异常：' + err.message);
           urlInput.placeholder = '可手动输入图片链接';
           urlInput.value = '';
         }
