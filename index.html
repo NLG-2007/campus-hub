@@ -542,7 +542,7 @@
   }
 
   // ============================================================
-  //  5. 渲染卡片（删除按钮仅在“我的发布”中显示）
+  //  5. 渲染卡片
   // ============================================================
   function renderCards(items, isMine = false) {
     dataContainer.innerHTML = '';
@@ -665,7 +665,6 @@
       timeSpan.innerText = `📅 ${formatDate(item.created_at)}`;
       footer.appendChild(timeSpan);
 
-      // 只有“我的发布”才显示删除按钮
       if (isMine && currentUser) {
         const delBtn = document.createElement('button');
         delBtn.className = 'delete-card-btn';
@@ -707,7 +706,7 @@
   }
 
   // ============================================================
-  //  7. 删除逻辑（仅通过 id 删除，因为列表已过滤）
+  //  7. 删除逻辑（先查询是否存在，再删除，区分权限问题）
   // ============================================================
   async function deleteItemDirect(id, table) {
     if (!currentUser) {
@@ -716,24 +715,51 @@
     }
 
     try {
-      // 直接通过 id 删除（不校验 user_id）
+      // 1️⃣ 先查询记录是否存在
+      const { data: record, error: fetchError } = await supabaseClient
+        .from(table)
+        .select('id, user_id')
+        .eq('id', id)
+        .maybeSingle(); // 使用 maybeSingle 避免找不到时抛错
+
+      if (fetchError) {
+        alert('查询记录失败：' + fetchError.message);
+        console.error('查询错误：', fetchError);
+        return;
+      }
+
+      if (!record) {
+        alert('该记录不存在，可能已被其他用户删除');
+        return;
+      }
+
+      // 2️⃣ 执行删除
       const { data, error } = await supabaseClient
         .from(table)
         .delete({ returning: 'representation' })
         .match({ id });
 
-      if (error) throw error;
+      if (error) {
+        // 如果是 RLS 权限错误，给出明确提示
+        if (error.message.toLowerCase().includes('row-level security') || error.code === '42501') {
+          alert('删除失败：权限不足。\n原因：数据库 RLS 策略阻止了你的删除操作。\n建议：请联系管理员关闭 RLS 或创建允许删除的策略。');
+        } else {
+          alert('删除失败：' + error.message);
+        }
+        console.error('删除错误详情：', error);
+        return;
+      }
 
       if (!data || data.length === 0) {
-        alert('删除失败：未找到该记录（可能已被删除）');
+        alert('删除失败：未成功删除，请重试');
         return;
       }
 
       alert('删除成功！');
       fetchMyItems(); // 刷新列表
     } catch (err) {
-      alert('删除失败：' + err.message);
-      console.error('删除错误详情：', err);
+      alert('删除异常：' + err.message);
+      console.error('删除异常：', err);
     }
   }
 
@@ -817,7 +843,6 @@
       `;
     }
 
-    // 绑定图片上传事件
     const fileInput = document.getElementById('imageUpload');
     const urlInput = document.getElementById('imageUrlInput');
     if (fileInput && urlInput) {
