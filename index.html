@@ -508,7 +508,7 @@
       <div id="detail-content"></div>
     </div>
   </div>
-  <!-- 登录/注册弹窗（含邮箱验证提示） -->
+  <!-- ===== 登录/注册弹窗（含邮箱验证提示 + 复制链接提示） ===== -->
   <div class="modal-overlay" id="authModalOverlay">
     <div class="modal">
       <button class="close-btn" id="closeAuthModal">&times;</button>
@@ -522,9 +522,13 @@
           <label>密码</label>
           <input type="password" id="authPassword" required placeholder="至少6位">
         </div>
-        <!-- ===== 新增：邮箱验证提示 ===== -->
-        <div style="font-size:13px; color:#888; margin-bottom:12px; text-align:center;">
+        <!-- ===== 邮箱验证提示区域 ===== -->
+        <div style="font-size:13px; color:#888; margin-bottom:8px; text-align:center; line-height:1.6;">
           📧 注册后请前往邮箱完成验证
+          <br>
+          <span style="font-size:12px; color:#aaa;">
+            💡 如果在电子邮箱中打不开页面，请复制链接前往浏览器打开
+          </span>
         </div>
         <button type="submit" class="submit-btn" id="authSubmitBtn">登录</button>
       </form>
@@ -548,7 +552,7 @@
     let currentUser = null;
     let currentTab = 'lost';
     let allItems = [];
-    let currentFilter = 'all'; // 分类或类型
+    let currentFilter = 'all';
     let searchKeyword = '';
 
     // DOM 引用
@@ -677,7 +681,6 @@
         } else {
           const { error } = await supabaseClient.auth.signUp({ email, password });
           if (error) throw error;
-          // ===== 修改：注册成功后提示去邮箱验证 =====
           alert('注册成功！请前往邮箱完成验证后登录。');
           isLoginMode = true;
           authModalTitle.innerText = '登录';
@@ -753,7 +756,6 @@
     // ============================================================
     function applyFilters() {
       if (currentTab === 'lost') {
-        // 失物招领：按类型（丢失/招领）和关键词
         let filtered = allItems.filter(item => {
           if (currentFilter !== 'all' && item.type !== currentFilter) return false;
           if (searchKeyword.trim() !== '') {
@@ -766,7 +768,6 @@
         });
         renderCards(filtered, false);
       } else if (currentTab === 'trade') {
-        // 二手交易：按分类和关键词
         let filtered = allItems.filter(item => {
           if (currentFilter !== 'all' && item.category !== currentFilter) return false;
           if (searchKeyword.trim() !== '') {
@@ -781,13 +782,12 @@
       }
     }
 
-    // 渲染卡片（两种风格：失物招领和二手交易统一使用卡片网格）
     function renderCards(items, isMine = false) {
       dataContainer.innerHTML = '';
       if (!items || items.length === 0) {
         emptyState.style.display = 'block';
         if (isMine) {
-          emptyText.innerHTML = '你还没有发布任何信息 📝<br>点击“发布信息”开始吧！';
+          emptyText.innerHTML = '你还没有发布任何信息 📝<br>点击"发布信息"开始吧！';
         } else if (currentTab === 'lost') {
           emptyText.innerHTML = '📭 没有匹配的失物招领信息<br>试试其他类型或关键词';
         } else if (currentTab === 'trade') {
@@ -803,7 +803,6 @@
       grid.className = 'cards-grid';
 
       items.forEach(item => {
-        // 判断是否来自失物招领
         let isLost = false;
         if (isMine) {
           isLost = (item._source === 'lost');
@@ -811,12 +810,10 @@
           isLost = (currentTab === 'lost');
         }
 
-        // 构建卡片
         const card = document.createElement('div');
         card.className = 'card';
         if (!isLost && item.is_sold) card.classList.add('sold');
 
-        // 图片
         const img = document.createElement('img');
         img.className = 'card-img';
         img.src = item.image_url || 'https://via.placeholder.com/300x160?text=无图';
@@ -824,7 +821,6 @@
         img.loading = 'lazy';
         card.appendChild(img);
 
-        // 已售标签（仅二手交易）
         if (!isLost && item.is_sold) {
           const tag = document.createElement('div');
           tag.className = 'sold-tag';
@@ -832,11 +828,9 @@
           card.appendChild(tag);
         }
 
-        // 卡片主体
         const body = document.createElement('div');
         body.className = 'card-body';
 
-        // 类型/分类徽章
         const badge = document.createElement('div');
         badge.className = isLost ? 'card-type-badge' : 'card-type-badge';
         if (isLost) {
@@ -848,13 +842,11 @@
         }
         body.appendChild(badge);
 
-        // 标题
         const title = document.createElement('div');
         title.className = 'card-title';
         title.innerText = item.item_name;
         body.appendChild(title);
 
-        // 价格（二手交易）
         if (!isLost) {
           const price = document.createElement('div');
           price.className = 'card-price';
@@ -862,7 +854,6 @@
           body.appendChild(price);
         }
 
-        // 附加信息（失物招领显示地点和时间，二手交易显示成色等）
         const meta = document.createElement('div');
         meta.className = 'card-meta';
         if (isLost) {
@@ -882,14 +873,12 @@
             span.innerText = `⭐ ${item.condition}`;
             meta.appendChild(span);
           }
-          // 显示发布时间
           const span = document.createElement('span');
           span.innerText = `📅 ${formatDate(item.created_at)}`;
           meta.appendChild(span);
         }
         body.appendChild(meta);
 
-        // 联系人（统一显示）
         const seller = document.createElement('div');
         seller.className = 'card-seller';
         seller.innerText = item.contact_name || '匿名';
@@ -897,7 +886,6 @@
 
         card.appendChild(body);
 
-        // 如果“我的发布”，添加底部删除按钮和时间
         if (isMine && currentUser) {
           const footer = document.createElement('div');
           footer.className = 'card-footer';
@@ -918,7 +906,6 @@
           footer.appendChild(delBtn);
           card.appendChild(footer);
         } else {
-          // 非我的发布，显示底部时间
           const footer = document.createElement('div');
           footer.className = 'card-footer';
           const timeSpan = document.createElement('span');
@@ -928,7 +915,6 @@
           card.appendChild(footer);
         }
 
-        // 点击卡片查看详情
         card.addEventListener('click', () => {
           showDetail(item, isLost);
         });
@@ -1047,9 +1033,9 @@
         publishForm.innerHTML = `
           <div class="form-group"><label>商品名称 *</label><input type="text" name="item_name" required></div>
           <div class="form-group"><label>分类 *</label><select name="category" required><option value="数码">数码电子</option><option value="教材">书籍教材</option><option value="生活用品">生活用品</option><option value="服饰">服装鞋帽</option><option value="运动户外">运动户外</option><option value="其他">其他</option></select></div>
-          <div class="form-group"><label>价格</label><input type="text" name="price"></div>
+          <div class="form-group"><label>价格（元）</label><input type="number" name="price" min="0" step="0.01" placeholder="例如：2999"></div>
           <div class="form-group"><label>描述</label><textarea name="description" rows="2"></textarea></div>
-          <div class="form-group"><label>成色</label><input type="text" name="condition"></div>
+          <div class="form-group"><label>成色</label><input type="text" name="condition" placeholder="例如：99新、轻微使用痕迹"></div>
           <div class="form-group"><label>联系人 *</label><input type="text" name="contact_name" required></div>
           <div class="form-group"><label>联系方式 *</label><input type="text" name="contact_info" required></div>
           <div class="form-group">
@@ -1226,9 +1212,8 @@
         searchBox.style.display = 'flex';
         searchInput.placeholder = '搜索商品...';
       } else {
-        // 我的发布，隐藏搜索和筛选
         searchBox.style.display = 'none';
-        filterBar.innerHTML = ''; // 清空
+        filterBar.innerHTML = '';
       }
     }
 
@@ -1240,7 +1225,6 @@
       else if (tab === 'trade') { tabTrade.classList.add('active'); }
       else if (tab === 'mine') { tabMine.classList.add('active'); }
 
-      // 重置筛选和搜索
       currentFilter = 'all';
       searchKeyword = '';
       searchInput.value = '';
@@ -1257,7 +1241,6 @@
     tabTrade.addEventListener('click', () => switchTab('trade'));
     tabMine.addEventListener('click', () => switchTab('mine'));
 
-    // 搜索事件
     searchBtn.addEventListener('click', () => {
       searchKeyword = searchInput.value.trim();
       applyFilters();
@@ -1272,9 +1255,7 @@
     // ============================================================
     //  12. 初始化
     // ============================================================
-    // 设置初始筛选栏
     updateFilterBar();
-    // 加载失物招领数据
     fetchData();
   </script>
 </body>
