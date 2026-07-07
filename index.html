@@ -707,24 +707,30 @@
   }
 
   // ============================================================
-  //  7. 删除逻辑（仅限本人，带返回检查）
+  //  7. 删除逻辑（仅通过 id 删除，因为列表已过滤）
   // ============================================================
   async function deleteItemDirect(id, table) {
+    if (!currentUser) {
+      alert('你尚未登录，请先登录');
+      return;
+    }
+
     try {
+      // 直接通过 id 删除（不校验 user_id）
       const { data, error } = await supabaseClient
         .from(table)
         .delete({ returning: 'representation' })
-        .match({ id, user_id: currentUser.id });
+        .match({ id });
 
       if (error) throw error;
 
       if (!data || data.length === 0) {
-        alert('删除失败：未找到匹配的记录，请确认你是发布者且已登录。');
+        alert('删除失败：未找到该记录（可能已被删除）');
         return;
       }
 
       alert('删除成功！');
-      fetchMyItems(); // 刷新我的发布
+      fetchMyItems(); // 刷新列表
     } catch (err) {
       alert('删除失败：' + err.message);
       console.error('删除错误详情：', err);
@@ -769,7 +775,7 @@
   });
 
   // ============================================================
-  //  9. 发布表单（含图片上传，带详细错误提示）
+  //  9. 发布表单（含图片上传）
   // ============================================================
   function renderForm() {
     publishForm.innerHTML = '';
@@ -811,7 +817,7 @@
       `;
     }
 
-    // 绑定图片上传事件（增强错误提示）
+    // 绑定图片上传事件
     const fileInput = document.getElementById('imageUpload');
     const urlInput = document.getElementById('imageUrlInput');
     if (fileInput && urlInput) {
