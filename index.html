@@ -508,7 +508,7 @@
       <div id="detail-content"></div>
     </div>
   </div>
-  <!-- 登录/注册弹窗 -->
+  <!-- 登录/注册弹窗（含邮箱验证提示） -->
   <div class="modal-overlay" id="authModalOverlay">
     <div class="modal">
       <button class="close-btn" id="closeAuthModal">&times;</button>
@@ -521,6 +521,10 @@
         <div class="form-group">
           <label>密码</label>
           <input type="password" id="authPassword" required placeholder="至少6位">
+        </div>
+        <!-- ===== 新增：邮箱验证提示 ===== -->
+        <div style="font-size:13px; color:#888; margin-bottom:12px; text-align:center;">
+          📧 注册后请前往邮箱完成验证
         </div>
         <button type="submit" class="submit-btn" id="authSubmitBtn">登录</button>
       </form>
@@ -673,7 +677,8 @@
         } else {
           const { error } = await supabaseClient.auth.signUp({ email, password });
           if (error) throw error;
-          alert('注册成功！请登录。');
+          // ===== 修改：注册成功后提示去邮箱验证 =====
+          alert('注册成功！请前往邮箱完成验证后登录。');
           isLoginMode = true;
           authModalTitle.innerText = '登录';
           authSubmitBtn.innerText = '登录';
