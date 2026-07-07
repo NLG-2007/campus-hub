@@ -706,7 +706,7 @@
   }
 
   // ============================================================
-  //  7. 删除逻辑（先查询是否存在，再删除，区分权限问题）
+  //  7. 删除逻辑（通过 RPC，绕过 RLS）
   // ============================================================
   async function deleteItemDirect(id, table) {
     if (!currentUser) {
@@ -715,48 +715,25 @@
     }
 
     try {
-      // 1️⃣ 先查询记录是否存在
-      const { data: record, error: fetchError } = await supabaseClient
-        .from(table)
-        .select('id, user_id')
-        .eq('id', id)
-        .maybeSingle(); // 使用 maybeSingle 避免找不到时抛错
+      // 根据表名选择对应的 RPC 函数
+      const rpcFunction = table === 'lost_found' ? 'delete_lost_item_by_id' : 'delete_trade_item_by_id';
 
-      if (fetchError) {
-        alert('查询记录失败：' + fetchError.message);
-        console.error('查询错误：', fetchError);
-        return;
-      }
-
-      if (!record) {
-        alert('该记录不存在，可能已被其他用户删除');
-        return;
-      }
-
-      // 2️⃣ 执行删除
-      const { data, error } = await supabaseClient
-        .from(table)
-        .delete({ returning: 'representation' })
-        .match({ id });
+      const { data, error } = await supabaseClient.rpc(rpcFunction, {
+        item_id: id
+      });
 
       if (error) {
-        // 如果是 RLS 权限错误，给出明确提示
-        if (error.message.toLowerCase().includes('row-level security') || error.code === '42501') {
-          alert('删除失败：权限不足。\n原因：数据库 RLS 策略阻止了你的删除操作。\n建议：请联系管理员关闭 RLS 或创建允许删除的策略。');
-        } else {
-          alert('删除失败：' + error.message);
-        }
-        console.error('删除错误详情：', error);
+        console.error('RPC 调用错误：', error);
+        alert('删除失败：' + error.message);
         return;
       }
 
-      if (!data || data.length === 0) {
-        alert('删除失败：未成功删除，请重试');
-        return;
+      if (data === true) {
+        alert('删除成功！');
+        fetchMyItems(); // 刷新“我的发布”列表
+      } else {
+        alert('删除失败：未找到符合条件的记录，或你没有权限删除该记录。');
       }
-
-      alert('删除成功！');
-      fetchMyItems(); // 刷新列表
     } catch (err) {
       alert('删除异常：' + err.message);
       console.error('删除异常：', err);
